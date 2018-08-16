@@ -172,12 +172,12 @@ plot(countXO(cold6), ylab="Number of crossovers")
 #most lines have double crossovers betweem 30-150 but ehre are clear outliers. Lets remove these for now
 cold6 <- subset(cold6, ind=(countXO(cold6) < 200))
 #We lose 8 lines
-nind(cold6)
+nind(cold6)   #87
 #Did this qualitatively improve our genotyping?
 geno.image(cold6)
 #I'm not sure if retaining the indvidual with missing data is helpful or not, it is not helpful to have the individual for the nexy
 #step (identifying potential genotyping errors ) so I will remove that individual
-cold6 <- subset(cold6, ind=(ntyped(cold6)>700))
+cold6 <- subset(cold6, ind=(ntyped(cold6)>700))   #68
 
 #Now can We identify potentially erroneous double crossovers assumign a genotyping error rate of 1%
 cold6 <- calc.errorlod(cold6, error.prob=0.01)
@@ -186,38 +186,41 @@ cold6 <- calc.errorlod(cold6, error.prob=0.01)
 nrow(toperr <- top.errorlod(cold6, cutoff=5))
 
 #remove markers with LOD scores greater than five and store it as a new cross object
-cold6.clean <-cold6
+cold6c <-cold6
 for(i in 1:nrow(toperr)) {
   chr <- toperr$chr[i]
   id <- toperr$id[i]
   mar <- toperr$marker[i]
-  cold6.clean$geno[[chr]]$data[id, mar] <- NA
+  cold6c$geno[[chr]]$data[id, mar] <- NA
 }
 
 #NOTE: I would recommend looking at the help page for calc.errorlod to find out what is happening and also looking at the function
 #clean.geno() as an alternative/complimentary
 
 summary(cold6)
-summary(cold6.clean)
-#We haven't lost a lot of markers but we have lost 9 indiviuals
+summary(cold6c)
+#We haven't lost a lot of markers but we have lost 9 indiviuals #8
 
 #Has the genotyping qualtiatively improved?
-geno.image(cold6.clean)
+geno.image(cold6c)
 
 
 
 #------------------------------------------------------------------------------------------------------------------------------------------
 #YOU COULD IGNORE THE FOLLOWING IF YOU LIKE, it is not directly related to above it is just checking the genetic map
 #estimating the map using the est.map function
-newmap <- est.map(cold6, n.cluster=6)
-plotMap(cold6, newmap, alternate.chrid=T)
+newmap <- est.map(cold6c, n.cluster=6)
+plotMap(cold6c, newmap, alternate.chrid=T)
+plotMap(cold6c, newmap, alternate.chrid=T)
 #There seem to be some potentially problematic markers on s13337  (and maybe the terminal one on s13117)
 #Lets calculate pairwise recombination frequency
 #Can we remove the problematic (unlinked markers) on s13337
-#cold6 <- est.rf(cold6)
+cold6c <- est.rf(cold6c)
 #and plot it 
-#plotRF(cold6, alternate.chrid=T) 
-#checkAlleles(cold6)
+plotRF(cold6c, alternate.chrid=T) 
+checkAlleles(cold6c)
+#No apparent problems.
+
 #cold6<-drop.markers(cold6, c("19153", "19632"))
 #cold6 <- est.rf(cold6)
 #plotRF(cold6, alternate.chrid=T) 
@@ -228,163 +231,155 @@ plotMap(cold6, newmap, alternate.chrid=T)
 #Note I've put step to 0 so that it does not estimate any intermarker distances as this does not make much sense
 #if you haven't estimated a genetic map. I would recommend that in additional to the analysis with no estimated genetic map
 #you could do one with a genetic map estimated assuming F.gen=5, you can covert the current cross to F5 and simulatenously estimate the map as follows:
-#cold6.clean.F5<- convert2bcsft(cold6.clean, F.gen = 5)
+
+cold6.c.F5<- convert2bcsft(cold6c, F.gen = 5)
 #Have a look at the genetic map before proceeding? Does it look reasonable?
+plotMap(cold6c.F5, alternate.chrid = T)
+summaryMap(cold6c.F5)
+#         n.mar length ave.spacing max.spacing
+# overall  1400  962.0         0.7        55.5
+lg<-formLinkageGroups(cold6c.F5, max.rf = 0.35, min.lod = 6)
+table(lg[,2])
+#  1   2   3   4   5   6   7   8   9 
+#784 200 180 125  79  27   2   2   1 
 
+############################ scanone
 
-cold6 <- calc.genoprob(cold6, step = 0)   # calculate additional information: QTL genotype probabilities, step = density of the grin (in cM) 
-result_em_cold6 <- scanone(cold6, pheno.col=1, method= "em")
-result_hk_cold6 <- scanone(cold6, pheno.col=1, method= "hk")
-result_ehk_cold6 <- scanone(cold6, pheno.col=1, method= "ehk")
+cold6c.F5 <- calc.genoprob(cold6c.F5, step = 1)   # set back to 1 since we are using the genetic map now
+result_em_cold6c.F5 <- scanone(cold6c.F5, pheno.col=1, method= "em")
+result_hk_cold6c.F5 <- scanone(cold6c.F5, pheno.col=1, method= "hk")
+result_ehk_cold6c.F5 <- scanone(cold6c.F5, pheno.col=1, method= "ehk")
 # find significance threshold
-perm_em_cold6<-scanone(cold6, method="em", n.perm = 1000)
-perm_hk_cold6<-scanone(cold6, method="hk", n.perm = 1000)
-perm_ehk_cold6<-scanone(cold6, method="ehk", n.perm = 1000)
-summary(perm_em_cold6)
-#     lod
-#5%  3.90
-#10% 3.52
-summary(perm_hk_cold6)
-#     lod
-#5%  3.94
-#10% 3.53
-summary(perm_ehk_cold6)  
-# 167
-summary(result_em_cold6, threshold=3.5, df=TRUE)
-#                chr    pos  lod
-#377          s12903  0.295 3.54   # not sig at 5%
-#cs13337.loc2 s13337  2.084 7.39
-#23306        s13340 11.450 5.78
-summary(result_hk_cold6, threshold=3.5, df=TRUE)
-#                chr    pos  lod
-#  377        s12903  0.295 3.61
-#cs13337.loc2 s13337  2.084 7.17
+perm_em_cold6c.F5<-scanone(cold6c.F5, method="em", n.perm = 1000)
+perm_hk_cold6c.F5<-scanone(cold6c.F5, method="hk", n.perm = 1000)
+perm_ehk_cold6c.F5<-scanone(cold6c.F5, method="ehk", n.perm = 1000)
+summary(perm_em_cold6c.F5)
+#lod
+#5%  4.66
+#10% 4.18
+summary(perm_hk_cold6c.F5)
+#lod
+#5%  4.00
+#10% 3.58
+summary(perm_ehk_cold6c.F5)  
+#lod
+#5%  153
+#10% 153
+summary(result_em_cold6c.F5, threshold=4.1, df=TRUE)
+#                 chr     pos  lod
+#22061         s13337  0.0839 6.81
+#cs13340.loc80 s13340 80.0531 5.13
+summary(result_hk_cold6c.F5, threshold=3.5, df=TRUE)
+#               chr     pos  lod
+#22061         s13337  0.0839 6.82
+#cs13340.loc80 s13340 80.0531 5.27
 #23306        s13340 11.450 5.86
 
-lodint(result_em_cold6, chr="s13337") 
-#                chr      pos      lod
-#22061        s13337 0.083871 6.896617
-#cs13337.loc2 s13337 2.083871 7.394478
-#21689        s13337 6.757392 5.248228
-lodint(result_em_cold6, chr="s13340") 
-#                 chr      pos      lod
-#cs13340.loc10 s13340 10.05311 4.162521
-#23306         s13340 11.45033 5.777952
-#23858         s13340 13.69258 3.543581
 
-######## scantwo
+################### scantwo
 
-cold6 <- calc.genoprob(cold6, step = 0) 
-result_scan2_hk_cold6 <- scantwo(cold6, pheno.col=1, method= "hk", clean.output=TRUE)       
-summary(result_scan2_hk_cold6)
-perm_scan2_hk_cold6<- scantwopermhk(cold6, n.perm = 1000)  # takes a while
-scan2_hk_cold6_summary <- summary(result_scan2_hk_cold6, perms = perm_scan2_hk_cold6, alpha = 0.2, pvalues=T)
-#                pos1f pos2f lod.full  pval lod.fv1  pval lod.int pval     pos1a pos2a lod.add pval lod.av1 pval
-#cs13337:cs13340  2.08  13.1     12.2 0.001    5.07 0.951    1.03    1      2.08  10.1    11.2    0    4.04 0.03
+cold6c.F5 <- calc.genoprob(cold6c.F5, step = 1) 
+result_scan2_hk_cold6c.F5 <- scantwo(cold6c.F5, pheno.col=1, method= "hk", clean.output=TRUE)       
+perm_scan2_hk_cold6c.F5<- scantwopermhk(cold6c.F5, n.perm = 1000)  # takes FOREVER
+scan2_hk_cold6c.F5_summary <- summary(result_scan2_hk_cold6c.F5, perms = perm_scan2_hk_cold6c.F5, alpha = 0.2, pvalues=T)
 
-write.table(scan2_hk_cold6_summary, "../../Analysis_in_R/version6_scan2.csv", row.names = F)
+#                pos1f pos2f lod.full pval lod.fv1 pval lod.int pval     pos1a pos2a lod.add pval lod.av1 pval
+#cs12916:cs13340 92.16  74.1     10.1 0.03    4.86 0.99    1.63    1     92.16  80.1     8.5    0    3.23 0.19
+#cs13337:cs13340  7.08  30.1     12.6 0.00    5.77 0.71    1.24    1      7.08  30.1    11.4    0    4.54 0.02
+
+write.table(scan2_hk_cold6_summary, "../../Analysis_in_R/version6c.F5_scan2.csv", row.names = F)
+
+summary(perm_scan2_hk_cold6c.F5, alpha = 0.05)
+#   full  fv1  int  add  av1  one
+#5% 9.65 7.36 6.33 6.61 3.68 3.86
+
+########################### find markers
+
+find.marker(cold6c.F5, chr = "s13340", pos =80.1 )    #QTL3
+#"23306"
+find.marker(cold6c.F5, chr = "s13340", pos =30.1)     #QTL2
+#"27008"
+find.marker(cold6c.F5, chr = "s12916", pos =92.16)    #QTL4
+#" 2791"
+find.marker(cold6c.F5, chr = "s13337", pos =7.08)     #QTL1
+# "20419"
+
+
+############################### Plots
+# scanone
+plot(result_em_cold6c.F5, main="Scanone EM Algorithm",col="#08519c", alternate.chrid=TRUE)
+abline(h=summary(perm_em_cold6c.F5, alpha=0.05))
+#scantwo
+plot(result_scan2_hk_cold6c.F5, main="Test for interaction vs add model", alternate.chrid=TRUE, upper="int", lower = "add")
+
 
 
 ######## MQM by imputation
 
 #Multiple QTL model:
+#Multiple QTL model:
+cold6c.F5<- sim.geno(cold6c.F5, step = 1, n.draws = 32, error.prob = 0.0001)
+qtl_model6c <- sim.geno(cold6c.F5, step = 1, n.draws = 32, error.prob = 0.0001)
+qtl6c <- makeqtl(qtl_model6c,chr=c("s13337", "s13340","s13340", "s12916"), pos=c(7.08, 30.1,80.1,92.16)) # candidate regions
+qtl6c                                                                                                    
 
-qtl_model6 <- sim.geno(cold6, step = 1, n.draws = 32, error.prob = 0.0001)
-qtl6 <- makeqtl(qtl_model6,chr=c("s13337", "s13340"), pos=c(2.084, 11.450)) # candidate regions
-qtl6
+#QTL object containing imputed genotypes, with 32 imputations. 
+#
+#name    chr     pos n.gen
+#Q1  s13337@7.1 s13337  7.0839     3
+#Q2 s13340@30.1 s13340 30.1412     3
+#Q3 s13340@80.1 s13340 80.0531     3
+#Q4 s12916@92.2 s12916 92.1596     3
 
-# QTL object containing imputed genotypes, with 32 imputations. 
-# 
-#         name    chr     pos n.gen
-#Q1  s13337@2.1 s13337  2.0839     3
-#Q2 s13340@11.5 s13340 11.4503     3
+# NOTE:  QTL3: using the "additive position" at 80.1 cM gives better results then the "full position" at 74,1cM
 
-plot(qtl6, alternate.chrid=T, main= "Genetic map version 6") # Map of the chromosomes with candidate loci
+plot(qtl6, alternate.chrid=T, main= "Genetic map version 6c.F5") # Map of the chromosomes with candidate loci
 
 # possible model without interaction:
 
-out.fqa6 <- fitqtl(qtl_model6, qtl=qtl6, get.ests=T, pheno.col=1,formula=y~Q1+Q2)
-mqm_imp_cold6_summary <- summary(out.fqa6)
-
+out.fqa6c <- fitqtl(qtl_model6c, qtl=qtl6c, get.ests=T, pheno.col=1,formula=y~Q1+Q2+Q3+Q4)
+mqm_imp_cold6c_summary <- summary(out.fqa6c)
+mqm_imp_cold6c_summary
 # fitqtl summary
 # 
 # Method: multiple imputation 
 # Model:  normal phenotype
-# Number of observations : 94 
+# Number of observations : 86 
 # 
 # Full model result
 # ----------------------------------  
-#   Model formula: y ~ Q1 + Q2 
+#   Model formula: y ~ Q1 + Q2 + Q3 + Q4 
 # 
-#       df        SS        MS      LOD     %var Pvalue(Chi2)    Pvalue(F)
-# Model  4  8122.773 2030.6932 11.19068 42.20365 1.725543e-10 5.021195e-10
-# Error 89 11123.838  124.9869                                            
-# Total 93 19246.611                                                      
+# df       SS         MS      LOD     %var Pvalue(Chi2)    Pvalue(F)
+# Model  8 10740.64 1342.57957 16.31011 58.24629 4.687362e-13 5.758949e-12
+# Error 77  7699.40   99.99221                                            
+# Total 85 18440.04                                                       
 # 
 # 
 # Drop one QTL at a time ANOVA table: 
 #   ----------------------------------  
-#             df Type III SS   LOD  %var F value Pvalue(Chi2) Pvalue(F)    
-# s13337@2.1   2        3450 5.515 17.93   13.80            0  6.01e-06 ***
-# s13340@11.5  2        2558 4.225 13.29   10.23            0     1e-04 ***
+#   df Type III SS   LOD   %var F value Pvalue(Chi2) Pvalue(F)    
+# s13337@7.1   2        2768 5.735 15.008  13.839        0.000  7.34e-06 ***
+#   s13340@30.1  2        1651 3.629  8.956   8.258        0.000  0.000563 ***
+#   s13340@80.1  2        1246 2.801  6.757   6.230        0.002  0.003106 ** 
+#   s12916@92.2  2        1090 2.473  5.911   5.450        0.003  0.006113 ** 
 #   ---
 #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 # 
 # 
 # Estimated effects:
 #   -----------------
-#                  est      SE      t
-# Intercept    48.5213  1.3745 35.302
-# s13337@2.1a   7.5859  1.4518  5.225
-# s13337@2.1d  -0.6892  2.6374 -0.261
-# s13340@11.5a  5.9225  1.4428  4.105
-# s13340@11.5d -4.7136  2.6821 -1.757
+#   est       SE      t
+# Intercept     46.2261   1.4858 31.112
+# s13337@7.1a    7.0847   1.3692  5.175
+# s13337@7.1d   -1.7591   2.4670 -0.713
+# s13340@30.1a  -0.0689   1.4843 -0.046
+# s13340@30.1d -10.6973   2.6662 -4.012
+# s13340@80.1a   5.1059   1.4984  3.408
+# s13340@80.1d  -1.2126   2.9654 -0.409
+# s12916@92.2a  -3.9349   1.3576 -2.899
+# s12916@92.2d  -4.1797   2.6314 -1.588
 
-mqm_imp_cold6_tab <- mqm_imp_cold6_summary$result.drop 
-write.table(mqm_imp_cold6_tab, file="mqm_imp_cold6.csv", sep="\t", quote=FALSE, row.names=TRUE) 
-
-# alternatively: model with interaction:
-
-out.fqa6a <- fitqtl(qtl_model6, qtl=qtl6, get.ests=T, pheno.col=1,formula=y~Q1*Q2)
-mqm_imp_cold6a_summary <- summary(out.fqa6a)
-
-
-# fitqtl summary
-# 
-# Method: multiple imputation 
-# Model:  normal phenotype
-# Number of observations : 94 
-# 
-# Full model result
-# ----------------------------------  
-#   Model formula: y ~ Q1 + Q2 + Q1:Q2 
-# 
-# df        SS        MS      LOD     %var Pvalue(Chi2)    Pvalue(F)
-# Model  8  8509.512 1063.6890 11.91296 44.21304 4.697757e-09 2.340231e-08
-# Error 85 10737.099  126.3188                                            
-# Total 93 19246.611                                                      
-# 
-# 
-# Drop one QTL at a time ANOVA table: 
-#   ----------------------------------  
-#   df Type III SS    LOD   %var F value Pvalue(Chi2) Pvalue(F)    
-# s13337@2.1              6      3837.1 6.2368 19.937  5.0628        0.000  0.000175 ***
-#   s13340@11.5             6      2944.6 4.9468 15.299  3.8851        0.001  0.001781 ** 
-#   s13337@2.1:s13340@11.5  4       386.7 0.7223  2.009  0.7654        0.505  0.550683    
-# ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
-# 
-# Estimated effects:
-#   -----------------
-#   est      SE      t
-# Intercept                48.2083  1.4595 33.030
-# s13337@2.1a               6.9167  1.7484  3.956
-# s13337@2.1d               0.5324  2.9411  0.181
-# s13340@11.5a              5.2267  1.6948  3.084
-# s13340@11.5d             -4.9973  2.9084 -1.718
-# s13337@2.1a:s13340@11.5a  2.2234  1.7519  1.269
-# s13337@2.1d:s13340@11.5a -1.5691  3.5239 -0.445
-# s13337@2.1a:s13340@11.5d -2.8247  3.5809 -0.789
-# s13337@2.1d:s13340@11.5d  0.9469  6.0358  0.157
+mqm_imp_cold6c.F5_tab <- mqm_imp_cold6c.F5_summary$result.drop 
+write.table(mqm_imp_cold6c.F5_tab, file="mqm_imp_cold6c.F5.csv", sep="\t", quote=FALSE, row.names=TRUE) 
 
